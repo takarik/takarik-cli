@@ -1,6 +1,176 @@
+require "option_parser"
+require "file_utils"
+
 # TODO: Write documentation for `Takarik::Cli`
 module Takarik::Cli
-  VERSION = "0.1.0"
+  VERSION = "0.0.1"
 
-  # TODO: Put your code here
+  # Template processing
+  private def self.read_template(template_path : String, substitutions : Hash(String, String)) : String
+    template_content = File.read(File.join(__DIR__, "..", "templates", template_path))
+
+    substitutions.each do |placeholder, value|
+      template_content = template_content.gsub("{{#{placeholder}}}", value)
+    end
+
+    template_content
+  end
+
+  def self.run(args = ARGV)
+    command = nil
+    app_name = nil
+    target_path = nil
+
+    parser = OptionParser.new do |parser|
+      parser.banner = "Usage: takarik <command> [options]"
+
+      parser.on("new", "Create a new application") do
+        command = "new"
+        parser.banner = "Usage: takarik new <app_name> <path> [options]"
+      end
+
+      parser.on("-h", "--help", "Show help") do
+        puts parser
+        exit
+      end
+
+      parser.on("-v", "--version", "Show version") do
+        puts "Takarik CLI v#{VERSION}"
+        exit
+      end
+
+      parser.unknown_args do |before_dash, after_dash|
+        case command
+        when "new"
+          if before_dash.size < 2
+            puts "Error: 'new' command requires <app_name> and <path>"
+            puts "Example: takarik new my-app ."
+            exit(1)
+          end
+          app_name = before_dash[0]
+          target_path = before_dash[1]
+        else
+          unless before_dash.empty?
+            puts "Error: Unknown command '#{before_dash[0]}'"
+            puts parser
+            exit(1)
+          end
+        end
+      end
+    end
+
+    begin
+      parser.parse(args)
+    rescue ex : OptionParser::Exception
+      puts "Error: #{ex.message}"
+      puts parser
+      exit(1)
+    end
+
+    if command.nil?
+      puts parser
+      exit(1)
+    end
+
+    case command
+    when "new"
+      handle_new_command(app_name.not_nil!, target_path.not_nil!)
+    end
+  end
+
+  private def self.handle_new_command(app_name, target_path)
+    # Resolve the target path
+    full_path = File.expand_path(target_path)
+    app_dir = File.join(full_path, app_name)
+
+    puts "Creating new application '#{app_name}' in #{app_dir}"
+
+    create_app_structure(app_name, app_dir)
+
+    puts "✅ Application '#{app_name}' created successfully!"
+    puts "Next steps:"
+    puts "  cd #{app_name}"
+    puts "  shards install"
+  end
+
+  private def self.create_app_structure(app_name, app_dir)
+    # Create main directories
+    directories = [
+      "app",
+      "spec",
+      "config",
+      "models",
+      "db/migrations",
+      "public",
+      "views/layouts",
+      "lib"
+    ]
+
+    directories.each do |dir|
+      dir_path = File.join(app_dir, dir)
+      FileUtils.mkdir_p(dir_path)
+      puts "📁 Created directory: #{dir}"
+    end
+
+    # Create all files from templates
+    create_files_from_templates(app_name, app_dir)
+  end
+
+  # Helper to recursively find all files including hidden ones
+  private def self.find_all_files(dir : String, files : Array(String))
+    Dir.each(dir) do |entry|
+      next if entry == "." || entry == ".."
+      full_path = File.join(dir, entry)
+      if File.directory?(full_path)
+        find_all_files(full_path, files)
+      else
+        files << full_path
+      end
+    end
+  end
+
+  private def self.create_files_from_templates(app_name, app_dir)
+    module_name = app_name.split(/[-_]/).map(&.capitalize).join
+
+    substitutions = {
+      "APP_NAME" => app_name,
+      "MODULE_NAME" => module_name
+    }
+
+    templates_dir = File.join(__DIR__, "..", "templates")
+
+    # Process all files in templates directory recursively
+    all_files = [] of String
+    find_all_files(templates_dir, all_files)
+
+    all_files.each do |template_path|
+      # Skip directories
+      next if File.directory?(template_path)
+
+      # Get relative path from templates directory
+      relative_path = Path[template_path].relative_to(templates_dir)
+      target_relative_path = relative_path.to_s
+
+      # Apply substitutions to the filename/path as well
+      substitutions.each do |placeholder, value|
+        target_relative_path = target_relative_path.gsub("{{#{placeholder}}}", value)
+      end
+
+      # Create target file path
+      target_file_path = File.join(app_dir, target_relative_path)
+
+      # Ensure target directory exists
+      FileUtils.mkdir_p(File.dirname(target_file_path))
+
+      # Read template and apply substitutions
+      content = read_template(relative_path.to_s, substitutions)
+
+      # Write the file
+      File.write(target_file_path, content)
+
+      # Show friendly output
+      display_path = Path[target_file_path].relative_to(app_dir)
+      puts "📄 Created #{display_path}"
+    end
+  end
 end

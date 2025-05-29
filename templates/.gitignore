@@ -1,0 +1,28 @@
+# Crystal
+/docs/
+/lib/
+/bin/
+/.shards/
+*.dwarf
+
+# Dependencies
+/shard.lock
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+/build/
+/dist/

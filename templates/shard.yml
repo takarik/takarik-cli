@@ -1,0 +1,18 @@
+name: {{APP_NAME}}
+version: 0.0.1
+
+authors:
+  - Your Name <your.email@example.com>
+
+dependencies:
+  takarik:
+    github: takarik/takarik
+    version: "~> 0.0.1"
+
+targets:
+  {{APP_NAME}}:
+    main: app/{{APP_NAME}}.cr
+
+crystal: '>= 1.16.3'
+
+license: MIT
