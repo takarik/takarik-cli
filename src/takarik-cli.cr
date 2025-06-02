@@ -29,6 +29,11 @@ module Takarik::Cli
         parser.banner = "Usage: takarik new <app_name> <path> [options]"
       end
 
+      parser.on("cake", "Execute cake commands") do
+        command = "cake"
+        parser.banner = "Usage: takarik cake <cake_command> [args...]"
+      end
+
       parser.on("-h", "--help", "Show help") do
         puts parser
         exit
@@ -49,6 +54,16 @@ module Takarik::Cli
           end
           app_name = before_dash[0]
           target_path = before_dash[1]
+        when "cake"
+          if before_dash.empty?
+            puts "Error: 'cake' command requires at least one argument"
+            puts "Example: takarik cake migrate"
+            exit(1)
+          end
+          cake_command = before_dash[0]
+          cake_args = before_dash[1..] + after_dash
+          handle_cake_command(cake_command, cake_args)
+          exit
         else
           unless before_dash.empty?
             # Check if the command starts with ":"
@@ -83,6 +98,9 @@ module Takarik::Cli
     case command
     when "new"
       handle_new_command(app_name.not_nil!, target_path.not_nil!)
+    when "cake"
+      # This case is handled in unknown_args block above
+      # but we include it here for completeness
     end
   end
 
