@@ -51,9 +51,17 @@ module Takarik::Cli
           target_path = before_dash[1]
         else
           unless before_dash.empty?
-            puts "Error: Unknown command '#{before_dash[0]}'"
-            puts parser
-            exit(1)
+            # Check if the command starts with ":"
+            if before_dash[0].starts_with?(":")
+              cake_command = before_dash[0][1..]  # Remove the ":"
+              cake_args = before_dash[1..] + after_dash
+              handle_cake_command(cake_command, cake_args)
+              exit
+            else
+              puts "Error: Unknown command '#{before_dash[0]}'"
+              puts parser
+              exit(1)
+            end
           end
         end
       end
@@ -91,6 +99,13 @@ module Takarik::Cli
     puts "Next steps:"
     puts "  cd #{app_name}"
     puts "  shards install"
+  end
+
+  private def self.handle_cake_command(command, args)
+    # Execute the globally installed cake command with arguments
+    full_args = [command] + args
+    status = Process.run("cake", full_args, input: Process::Redirect::Inherit, output: Process::Redirect::Inherit, error: Process::Redirect::Inherit)
+    exit(status.exit_code)
   end
 
   private def self.create_app_structure(app_name, app_dir)
