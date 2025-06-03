@@ -143,11 +143,8 @@ module Takarik::Cli
   end
 
   private def self.handle_console_command(args)
-    puts "🔮 Starting Takarik interactive console..."
+    puts "🔮 Starting Takarik console..."
     puts ""
-
-    # Check if ICR is available first
-    icr_available = system("which icr > /dev/null 2>&1") || system("where icr > NUL 2>&1")
 
     # Check if we're in a Takarik project directory
     if File.exists?("shard.yml")
@@ -156,54 +153,18 @@ module Takarik::Cli
       # Look for the app structure: app/APP_NAME.cr
       app_main_file = find_app_main_file()
 
-      if icr_available && app_main_file
-        puts "🚀 Using ICR with your app loaded"
-        puts "📚 Loading: #{app_main_file}"
-        puts ""
-
-        # Use ICR with the app file
-        status = Process.run("icr", ["-r", "./#{app_main_file}"],
-                           input: Process::Redirect::Inherit,
-                           output: Process::Redirect::Inherit,
-                           error: Process::Redirect::Inherit)
-        exit(status.exit_code)
-      elsif icr_available
-        puts "🚀 Using ICR (no main app file found)"
-        puts "💡 You can manually require files with: require \"./app/your_file\""
-        puts ""
-
-        status = Process.run("icr", [] of String,
-                           input: Process::Redirect::Inherit,
-                           output: Process::Redirect::Inherit,
-                           error: Process::Redirect::Inherit)
-        exit(status.exit_code)
+      if app_main_file
+        puts "📚 Loading project: #{app_main_file}"
+        start_console(app_main_file)
       else
-        # Fall back to our simple console
-        puts "⚠️  ICR not found - using simple Takarik console"
-        if app_main_file
-          puts "📚 Will load: #{app_main_file}"
-          start_simple_console(app_main_file)
-        else
-          puts "⚠️  No main app file found"
-          puts "💡 Expected structure: app/your_app_name.cr"
-          puts "🔧 Starting basic console instead"
-          start_simple_console(nil)
-        end
+        puts "⚠️  No main app file found"
+        puts "💡 Expected structure: app/your_app_name.cr"
+        puts "🔧 Starting basic console instead"
+        start_console(nil)
       end
     else
       puts "⚡ Not in a Takarik project directory"
-
-      if icr_available
-        puts "🚀 Using ICR"
-        status = Process.run("icr", [] of String,
-                           input: Process::Redirect::Inherit,
-                           output: Process::Redirect::Inherit,
-                           error: Process::Redirect::Inherit)
-        exit(status.exit_code)
-      else
-        puts "⚠️  ICR not found - starting simple console"
-        start_simple_console(nil)
-      end
+      start_console(nil)
     end
   end
 
@@ -228,13 +189,13 @@ module Takarik::Cli
     nil
   end
 
-  private def self.start_simple_console(main_file : String?)
+  private def self.start_console(main_file : String?)
     puts ""
-    puts "🎯 Takarik Simple Console"
-    puts "💡 This will load your app and show available components"
+    puts "🎯 Takarik Console"
+    puts "💡 This will load and verify your app"
     puts ""
 
-    # Create a simple script that loads the app and shows info
+    # Create a script that loads the app and shows info
     console_script = create_console_script(main_file)
     temp_file = ".takarik_console.cr"
 
@@ -260,26 +221,30 @@ module Takarik::Cli
       if main_file
         str << "# Load the main application file\n"
         str << "begin\n"
-        str << "  require \"./#{main_file}\"\n"
-        str << "  puts \"✅ Successfully loaded: #{main_file}\"\n"
+        str << "  require \"./" << main_file << "\"\n"
+        str << "  puts \"✅ Successfully loaded: " << main_file << "\"\n"
         str << "rescue ex\n"
-        str << "  puts \"❌ Error loading #{main_file}: \#{ex.message}\"\n"
+        str << "  puts \"❌ Error loading " << main_file << ": \" + ex.message\n"
         str << "  puts \"   Make sure your app file is valid Crystal code\"\n"
         str << "  exit(1)\n"
         str << "end\n\n"
       end
 
       str << "puts \"\\n🎯 Takarik Console Ready!\"\n"
-      str << "puts \"\\n💡 Your Takarik app is loaded and verified!\"\n"
-      str << "puts \"\\n📋 To get a full interactive REPL experience:\"\n"
-      str << "puts \"   1. Install ICR: 'git clone https://github.com/crystal-community/icr.git && cd icr && make install'\"\n"
-      str << "puts \"   2. Run 'takarik console' again to use ICR automatically\"\n"
-      str << "puts \"\\n🔧 Alternative: Use 'crystal i' directly (experimental)\"\n"
+      str << "puts \"\\n💡 Your Takarik app compiled and loaded successfully!\"\n"
 
       if main_file
-        str << "puts \"\\n📖 Your app file (#{main_file}) is working correctly!\"\n"
+        str << "puts \"\\n📖 Your app file (" << main_file << ") is working correctly!\"\n"
         str << "puts \"   You can now develop with confidence that your code compiles\"\n"
+      else
+        str << "puts \"\\n📁 No app file found - console is ready for basic Crystal testing\"\n"
+        str << "puts \"   Create app/your_app_name.cr to get full app loading\"\n"
       end
+
+      str << "puts \"\\n🔧 For interactive development, consider:\"\n"
+      str << "puts \"   - Using 'crystal play' for web-based Crystal playground\"\n"
+      str << "puts \"   - Adding 'debugger' statements in your code and running with crystal\"\n"
+      str << "puts \"   - Using Crystal's built-in compiler for quick verification\"\n"
 
       str << "puts \"\\n Press Enter to exit...\"\n"
       str << "STDIN.gets\n"
