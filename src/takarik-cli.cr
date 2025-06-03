@@ -3,7 +3,7 @@ require "file_utils"
 
 # TODO: Write documentation for `Takarik::Cli`
 module Takarik::Cli
-  VERSION = "0.0.4"
+  VERSION = "0.0.5"
 
   # Template processing
   private def self.read_template(template_path : String, substitutions : Hash(String, String)) : String
@@ -252,16 +252,14 @@ module Takarik::Cli
 
     # Simple wildcard require that works
     if Dir.exists?("app/models") && !Dir.glob("app/models/*.cr").empty?
-      lines << "# Load all models"
-      lines << "require \"../app/models/*\""
-      lines << "puts \"✅ Loaded all models from app/models/\""
+      lines << "puts \"📁 Found models in app/models/\""
     else
       lines << "puts \"📁 No models found in app/models/\""
     end
 
     lines << ""
     lines << "puts \"🎯 Takarik Console Ready!\""
-    lines << "puts \"💡 Your models are loaded!\""
+    lines << "puts \"💡 Models will be loaded on-demand for each evaluation!\""
     lines << "puts \"   Type 'help' for commands, 'exit' to quit\""
     lines << ""
 
@@ -285,9 +283,45 @@ module Takarik::Cli
     lines << "    puts \"  exit       - Exit console\""
     lines << "    puts \"  Or type any Crystal code to evaluate\""
     lines << "  else"
+    lines << "    # Generate a unique filename for evaluation"
+    lines << "    timestamp = Time.utc.to_unix.to_s"
+    lines << "    eval_file = \"tmp/eval_\" + timestamp + \".cr\""
+    lines << ""
     lines << "    puts \"📝 You typed: \" + input"
-    lines << "    puts \"💡 Crystal code evaluation not implemented yet\""
-    lines << "    puts \"   But your models are loaded and available!\""
+    lines << "    puts \"🔄 Evaluating Crystal code...\""
+    lines << ""
+    lines << "    # Create evaluation script lines"
+    lines << "    eval_lines = [] of String"
+    lines << "    eval_lines << \"# Auto-generated evaluation script\""
+    lines << "    eval_lines << \"require \\\"../app/models/*\\\"\""
+    lines << "    eval_lines << \"\""
+    lines << "    eval_lines << \"begin\""
+    lines << "    eval_lines << \"  result = \" + input"
+    lines << "    eval_lines << \"  puts \\\"=> \\\" + result.inspect\""
+    lines << "    eval_lines << \"rescue ex\""
+    lines << "    eval_lines << \"  puts \\\"Error: \\\" + (ex.message || \\\"unknown error\\\")\""
+    lines << "    eval_lines << \"end\""
+    lines << ""
+    lines << "    File.write(eval_file, eval_lines.join(\"\\n\"))"
+    lines << ""
+    lines << "    begin"
+    lines << "      output = IO::Memory.new"
+    lines << "      error = IO::Memory.new"
+    lines << "      status = Process.run(\"crystal\", [\"run\", eval_file],"
+    lines << "                         output: output,"
+    lines << "                         error: error)"
+    lines << ""
+    lines << "      if status.exit_code == 0"
+    lines << "        puts output.to_s.strip"
+    lines << "      else"
+    lines << "        puts \"❌ Compilation error:\""
+    lines << "        puts error.to_s.strip"
+    lines << "      end"
+    lines << "    rescue ex"
+    lines << "      puts \"❌ Evaluation failed: \" + (ex.message || \"unknown error\")"
+    lines << "    ensure"
+    lines << "      File.delete(eval_file) if File.exists?(eval_file)"
+    lines << "    end"
     lines << "  end"
     lines << ""
     lines << "  puts \"\""
