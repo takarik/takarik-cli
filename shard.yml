@@ -10,4 +10,4 @@ license: MIT
 
 targets:
   takarik:
-    main: src/cli.cr
+    main: src/takarik-cli.cr
