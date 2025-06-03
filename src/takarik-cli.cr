@@ -198,8 +198,8 @@ module Takarik::Cli
     # Create an interactive console script that loads models
     console_script = create_interactive_console_script(main_file)
 
-    # Create temp directory and file path
-    temp_dir = File.join(Dir.tempdir, "takarik")
+    # Create temp directory in app root and file path
+    temp_dir = "tmp"
     Dir.mkdir_p(temp_dir) unless Dir.exists?(temp_dir)
     console_file = File.join(temp_dir, "takarik_console.cr")
 
@@ -253,7 +253,7 @@ module Takarik::Cli
     # Simple wildcard require that works
     if Dir.exists?("app/models") && !Dir.glob("app/models/*.cr").empty?
       lines << "# Load all models"
-      lines << "require \"./app/models/*\""
+      lines << "require \"../app/models/*\""
       lines << "puts \"✅ Loaded all models from app/models/\""
     else
       lines << "puts \"📁 No models found in app/models/\""
