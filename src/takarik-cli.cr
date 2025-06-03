@@ -3,7 +3,7 @@ require "file_utils"
 
 # TODO: Write documentation for `Takarik::Cli`
 module Takarik::Cli
-  VERSION = "0.0.2"
+  VERSION = "0.0.3"
 
   # Template processing
   private def self.read_template(template_path : String, substitutions : Hash(String, String)) : String
@@ -214,43 +214,43 @@ module Takarik::Cli
   end
 
   private def self.create_console_script(main_file : String?) : String
-    script = String.build do |str|
-      str << "# Takarik Console Script\n\n"
+    lines = [] of String
+    lines << "# Takarik Console Script"
+    lines << ""
 
-      # Load the main file if provided
-      if main_file
-        str << "# Load the main application file\n"
-        str << "begin\n"
-        str << "  require \"./" << main_file << "\"\n"
-        str << "  puts \"✅ Successfully loaded: " << main_file << "\"\n"
-        str << "rescue ex\n"
-        str << "  puts \"❌ Error loading " << main_file << ": \" + ex.message\n"
-        str << "  puts \"   Make sure your app file is valid Crystal code\"\n"
-        str << "  exit(1)\n"
-        str << "end\n\n"
-      end
-
-      str << "puts \"\\n🎯 Takarik Console Ready!\"\n"
-      str << "puts \"\\n💡 Your Takarik app compiled and loaded successfully!\"\n"
-
-      if main_file
-        str << "puts \"\\n📖 Your app file (" << main_file << ") is working correctly!\"\n"
-        str << "puts \"   You can now develop with confidence that your code compiles\"\n"
-      else
-        str << "puts \"\\n📁 No app file found - console is ready for basic Crystal testing\"\n"
-        str << "puts \"   Create app/your_app_name.cr to get full app loading\"\n"
-      end
-
-      str << "puts \"\\n🔧 For interactive development, consider:\"\n"
-      str << "puts \"   - Using 'crystal play' for web-based Crystal playground\"\n"
-      str << "puts \"   - Adding 'debugger' statements in your code and running with crystal\"\n"
-      str << "puts \"   - Using Crystal's built-in compiler for quick verification\"\n"
-
-      str << "puts \"\\n Press Enter to exit...\"\n"
-      str << "STDIN.gets\n"
+    # Load the main file if provided
+    if main_file
+      lines << "# Load the main application file"
+      lines << "begin"
+      lines << "  require \"./#{main_file}\""
+      lines << "  puts \"✅ Successfully loaded: #{main_file}\""
+      lines << "rescue ex"
+      lines << "  puts \"❌ Error loading #{main_file}: \" + ex.message"
+      lines << "  puts \"   Make sure your app file is valid Crystal code\""
+      lines << "  exit(1)"
+      lines << "end"
+      lines << ""
     end
 
-    script
+    lines << "puts \"\\n🎯 Takarik Console Ready!\""
+    lines << "puts \"\\n💡 Your Takarik app compiled and loaded successfully!\""
+
+    if main_file
+      lines << "puts \"\\n📖 Your app file (#{main_file}) is working correctly!\""
+      lines << "puts \"   You can now develop with confidence that your code compiles\""
+    else
+      lines << "puts \"\\n📁 No app file found - console is ready for basic Crystal testing\""
+      lines << "puts \"   Create app/your_app_name.cr to get full app loading\""
+    end
+
+    lines << "puts \"\\n🔧 For interactive development, consider:\""
+    lines << "puts \"   - Using 'crystal play' for web-based Crystal playground\""
+    lines << "puts \"   - Adding 'debugger' statements in your code and running with crystal\""
+    lines << "puts \"   - Using Crystal's built-in compiler for quick verification\""
+    lines << "puts \"\\n Press Enter to exit...\""
+    lines << "STDIN.gets"
+
+    lines.join("\n")
   end
 
   private def self.create_app_structure(app_name, app_dir)
