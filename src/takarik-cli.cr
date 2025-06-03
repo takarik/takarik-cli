@@ -3,7 +3,7 @@ require "file_utils"
 
 # TODO: Write documentation for `Takarik::Cli`
 module Takarik::Cli
-  VERSION = "0.0.1"
+  VERSION = "0.0.2"
 
   # Template processing
   private def self.read_template(template_path : String, substitutions : Hash(String, String)) : String
