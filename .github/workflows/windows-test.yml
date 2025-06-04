@@ -202,15 +202,18 @@ jobs:
       run: |
         Write-Host "Testing project creation..." -ForegroundColor Cyan
 
-        # Determine binary path
+        # Determine binary path (absolute)
+        $currentDir = Get-Location
         if (Test-Path "bin\takarik.exe") {
-          $binary = ".\bin\takarik.exe"
+          $binary = "$currentDir\bin\takarik.exe"
         } elseif (Test-Path "bin\takarik") {
-          $binary = ".\bin\takarik"
+          $binary = "$currentDir\bin\takarik"
         } else {
           Write-Host "❌ No executable found for testing!" -ForegroundColor Red
           exit 1
         }
+
+        Write-Host "Using binary: $binary" -ForegroundColor Cyan
 
         # Create a test project
         New-Item -ItemType Directory -Path "test-output" -Force
