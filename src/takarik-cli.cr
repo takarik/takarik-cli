@@ -398,5 +398,7 @@ module Takarik::Cli
   end
 end
 
-# Main entry point for the CLI
-Takarik::Cli.run(ARGV)
+# Main entry point for the CLI - only run if this file is executed directly
+if PROGRAM_NAME.ends_with?("takarik-cli.cr")
+  Takarik::Cli.run(ARGV)
+end
