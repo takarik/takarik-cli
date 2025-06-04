@@ -20,21 +20,83 @@ jobs:
     - name: Install Crystal on Windows
       shell: powershell
       run: |
-        # Install Crystal using Scoop (recommended package manager for Windows)
-        Write-Host "Installing Scoop..." -ForegroundColor Cyan
-        if (!(Get-Command scoop -ErrorAction SilentlyContinue)) {
-          Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
-          iwr -useb get.scoop.sh | iex
+        Write-Host "Installing Crystal on Windows..." -ForegroundColor Cyan
+
+        # Method 1: Try direct download from Crystal releases
+        Write-Host "Downloading Crystal Windows installer..." -ForegroundColor Yellow
+        $ProgressPreference = 'SilentlyContinue'
+
+        # Get the latest Crystal release for Windows
+        try {
+          $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/crystal-lang/crystal/releases/latest"
+          $windowsAsset = $releases.assets | Where-Object { $_.name -like "*windows*msvc*exe" } | Select-Object -First 1
+
+          if ($windowsAsset) {
+            Write-Host "Found Crystal installer: $($windowsAsset.name)" -ForegroundColor Green
+            $installerPath = "$env:TEMP\crystal-installer.exe"
+            Invoke-WebRequest -Uri $windowsAsset.browser_download_url -OutFile $installerPath
+
+            Write-Host "Running Crystal installer..." -ForegroundColor Yellow
+            Start-Process -FilePath $installerPath -ArgumentList "/S" -Wait
+
+            # Add Crystal to PATH for this session
+            $env:PATH = "$env:PATH;C:\crystal\bin"
+
+            Write-Host "Verifying Crystal installation..." -ForegroundColor Yellow
+            crystal --version
+            shards --version
+          } else {
+            throw "No Windows installer found in latest release"
+          }
+        } catch {
+          Write-Host "Direct download failed: $($_.Exception.Message)" -ForegroundColor Red
+          Write-Host "Trying Scoop installation..." -ForegroundColor Yellow
+
+          # Fallback to Scoop method
+          if (!(Get-Command scoop -ErrorAction SilentlyContinue)) {
+            Write-Host "Installing Scoop..." -ForegroundColor Cyan
+            Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+            iwr -useb get.scoop.sh | iex
+          }
+
+          # Add Crystal bucket and install
+          scoop bucket add crystal-preview https://github.com/neatorobito/scoop-crystal
+          scoop install crystal
+
+          # Refresh environment
+          refreshenv
+
+          Write-Host "Verifying Scoop Crystal installation..." -ForegroundColor Yellow
+          crystal --version
+          shards --version
         }
 
-        # Add Crystal bucket and install Crystal
-        Write-Host "Installing Crystal..." -ForegroundColor Cyan
-        scoop bucket add crystal-preview https://github.com/neatorobito/scoop-crystal
-        scoop install crystal
+    - name: Verify Crystal and Shards
+      shell: powershell
+      run: |
+        Write-Host "Final verification of Crystal and Shards..." -ForegroundColor Cyan
 
-        # Verify installation
-        crystal --version
-        shards --version
+        # Check if Crystal is available
+        try {
+          $crystalVersion = & crystal --version
+          Write-Host "✅ Crystal available: $($crystalVersion.Split("`n")[0])" -ForegroundColor Green
+        } catch {
+          Write-Host "❌ Crystal not found in PATH" -ForegroundColor Red
+          Write-Host "Current PATH: $env:PATH" -ForegroundColor Yellow
+          Get-Command crystal -ErrorAction SilentlyContinue | Format-List
+          exit 1
+        }
+
+        # Check if Shards is available
+        try {
+          $shardsVersion = & shards --version
+          Write-Host "✅ Shards available: $($shardsVersion.Split("`n")[0])" -ForegroundColor Green
+        } catch {
+          Write-Host "❌ Shards not found in PATH" -ForegroundColor Red
+          Write-Host "Current PATH: $env:PATH" -ForegroundColor Yellow
+          Get-Command shards -ErrorAction SilentlyContinue | Format-List
+          exit 1
+        }
 
     - name: Install dependencies
       shell: powershell
@@ -49,12 +111,16 @@ jobs:
         shards build --production
 
         # Check if executable was created
+        Write-Host "Checking for built executable..." -ForegroundColor Yellow
+        Get-ChildItem bin -ErrorAction SilentlyContinue | Format-Table Name, Length
+
         if (Test-Path "bin\takarik.exe") {
           Write-Host "✅ takarik.exe created successfully!" -ForegroundColor Green
         } elseif (Test-Path "bin\takarik") {
           Write-Host "✅ takarik binary created successfully!" -ForegroundColor Green
         } else {
           Write-Host "❌ No executable found in bin/" -ForegroundColor Red
+          Write-Host "Contents of bin directory:" -ForegroundColor Yellow
           Get-ChildItem bin -ErrorAction SilentlyContinue
           exit 1
         }
@@ -64,17 +130,17 @@ jobs:
       run: |
         Write-Host "Testing basic CLI functionality..." -ForegroundColor Cyan
 
-        # Add bin to PATH for this session
-        $env:PATH = "$env:PATH;$pwd\bin"
-
-        # Test version command
+        # Determine binary path
         if (Test-Path "bin\takarik.exe") {
-          $binary = "bin\takarik.exe"
+          $binary = ".\bin\takarik.exe"
+        } elseif (Test-Path "bin\takarik") {
+          $binary = ".\bin\takarik"
         } else {
-          $binary = "bin\takarik"
+          Write-Host "❌ No executable found for testing!" -ForegroundColor Red
+          exit 1
         }
 
-        Write-Host "Testing version command..." -ForegroundColor Yellow
+        Write-Host "Testing version command with: $binary" -ForegroundColor Yellow
         & $binary --version
 
         Write-Host "Testing help command..." -ForegroundColor Yellow
@@ -85,13 +151,14 @@ jobs:
       run: |
         Write-Host "Testing project creation..." -ForegroundColor Cyan
 
-        # Add bin to PATH
-        $env:PATH = "$env:PATH;$pwd\bin"
-
+        # Determine binary path
         if (Test-Path "bin\takarik.exe") {
-          $binary = "bin\takarik.exe"
+          $binary = ".\bin\takarik.exe"
+        } elseif (Test-Path "bin\takarik") {
+          $binary = ".\bin\takarik"
         } else {
-          $binary = "bin\takarik"
+          Write-Host "❌ No executable found for testing!" -ForegroundColor Red
+          exit 1
         }
 
         # Create a test project
@@ -104,6 +171,7 @@ jobs:
         # Verify project structure was created
         if (Test-Path "test-app") {
           Write-Host "✅ Project directory created!" -ForegroundColor Green
+          Write-Host "Project structure:" -ForegroundColor Cyan
           Get-ChildItem "test-app" -Recurse | Select-Object Name, Mode | Format-Table
         } else {
           Write-Host "❌ Project directory not created!" -ForegroundColor Red
@@ -141,7 +209,6 @@ jobs:
 
   test-powershell-installer:
     runs-on: windows-latest
-    needs: test-windows
 
     steps:
     - name: Checkout code
