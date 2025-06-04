@@ -1,0 +1,178 @@
+name: Windows Build Test
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  test-windows:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Install Crystal on Windows
+      shell: powershell
+      run: |
+        # Install Crystal using Scoop (recommended package manager for Windows)
+        Write-Host "Installing Scoop..." -ForegroundColor Cyan
+        if (!(Get-Command scoop -ErrorAction SilentlyContinue)) {
+          Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+          iwr -useb get.scoop.sh | iex
+        }
+
+        # Add Crystal bucket and install Crystal
+        Write-Host "Installing Crystal..." -ForegroundColor Cyan
+        scoop bucket add crystal-preview https://github.com/neatorobito/scoop-crystal
+        scoop install crystal
+
+        # Verify installation
+        crystal --version
+        shards --version
+
+    - name: Install dependencies
+      shell: powershell
+      run: |
+        Write-Host "Installing Shards dependencies..." -ForegroundColor Cyan
+        shards install
+
+    - name: Build application
+      shell: powershell
+      run: |
+        Write-Host "Building Takarik CLI..." -ForegroundColor Cyan
+        shards build --production
+
+        # Check if executable was created
+        if (Test-Path "bin\takarik.exe") {
+          Write-Host "✅ takarik.exe created successfully!" -ForegroundColor Green
+        } elseif (Test-Path "bin\takarik") {
+          Write-Host "✅ takarik binary created successfully!" -ForegroundColor Green
+        } else {
+          Write-Host "❌ No executable found in bin/" -ForegroundColor Red
+          Get-ChildItem bin -ErrorAction SilentlyContinue
+          exit 1
+        }
+
+    - name: Test basic functionality
+      shell: powershell
+      run: |
+        Write-Host "Testing basic CLI functionality..." -ForegroundColor Cyan
+
+        # Add bin to PATH for this session
+        $env:PATH = "$env:PATH;$pwd\bin"
+
+        # Test version command
+        if (Test-Path "bin\takarik.exe") {
+          $binary = "bin\takarik.exe"
+        } else {
+          $binary = "bin\takarik"
+        }
+
+        Write-Host "Testing version command..." -ForegroundColor Yellow
+        & $binary --version
+
+        Write-Host "Testing help command..." -ForegroundColor Yellow
+        & $binary --help
+
+    - name: Test new project creation
+      shell: powershell
+      run: |
+        Write-Host "Testing project creation..." -ForegroundColor Cyan
+
+        # Add bin to PATH
+        $env:PATH = "$env:PATH;$pwd\bin"
+
+        if (Test-Path "bin\takarik.exe") {
+          $binary = "bin\takarik.exe"
+        } else {
+          $binary = "bin\takarik"
+        }
+
+        # Create a test project
+        New-Item -ItemType Directory -Path "test-output" -Force
+        Set-Location "test-output"
+
+        Write-Host "Creating new test project..." -ForegroundColor Yellow
+        & $binary new test-app .
+
+        # Verify project structure was created
+        if (Test-Path "test-app") {
+          Write-Host "✅ Project directory created!" -ForegroundColor Green
+          Get-ChildItem "test-app" -Recurse | Select-Object Name, Mode | Format-Table
+        } else {
+          Write-Host "❌ Project directory not created!" -ForegroundColor Red
+          exit 1
+        }
+
+        # Try to build the generated project
+        Set-Location "test-app"
+        if (Test-Path "shard.yml") {
+          Write-Host "Testing generated project build..." -ForegroundColor Yellow
+          shards install
+          shards build
+          Write-Host "✅ Generated project builds successfully!" -ForegroundColor Green
+        }
+
+    - name: Run specs (if any)
+      shell: powershell
+      run: |
+        Write-Host "Running Crystal specs..." -ForegroundColor Cyan
+        if (Test-Path "spec") {
+          crystal spec
+        } else {
+          Write-Host "No spec directory found, skipping tests." -ForegroundColor Yellow
+        }
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: windows-build
+        path: |
+          bin/
+          test-output/
+        retention-days: 7
+
+  test-powershell-installer:
+    runs-on: windows-latest
+    needs: test-windows
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Test PowerShell installer (dry run)
+      shell: powershell
+      run: |
+        Write-Host "Testing PowerShell installer syntax..." -ForegroundColor Cyan
+
+        # Test that the PowerShell script has valid syntax
+        $scriptPath = ".\install.ps1"
+        if (Test-Path $scriptPath) {
+          $errors = $null
+          $tokens = $null
+          $ast = [System.Management.Automation.Language.Parser]::ParseFile($scriptPath, [ref]$tokens, [ref]$errors)
+
+          if ($errors.Count -eq 0) {
+            Write-Host "✅ PowerShell script has valid syntax!" -ForegroundColor Green
+          } else {
+            Write-Host "❌ PowerShell script has syntax errors:" -ForegroundColor Red
+            $errors | ForEach-Object { Write-Host "  - Line $($_.Extent.StartLineNumber): $($_.Message)" -ForegroundColor Red }
+            exit 1
+          }
+        } else {
+          Write-Host "❌ install.ps1 not found!" -ForegroundColor Red
+          exit 1
+        }
+
+        # Test help parameter
+        Write-Host "Testing script help..." -ForegroundColor Yellow
+        Get-Help .\install.ps1 -ErrorAction SilentlyContinue
+
+        Write-Host "✅ PowerShell installer tests passed!" -ForegroundColor Green

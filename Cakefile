@@ -32,7 +32,14 @@ end
 
 desc "Clean build artifacts"
 task :clean do
-  execute "rm -f bin/takarik bin/takarik.dwarf"
+  # Cross-platform compatible clean command
+  {% if flag?(:win32) %}
+    execute "if exist bin\\takarik.exe del bin\\takarik.exe"
+    execute "if exist bin\\takarik.pdb del bin\\takarik.pdb"
+    execute "if exist bin\\takarik del bin\\takarik"
+  {% else %}
+    execute "rm -f bin/takarik bin/takarik.dwarf"
+  {% end %}
   log "Build artifacts cleaned!"
 end
 
