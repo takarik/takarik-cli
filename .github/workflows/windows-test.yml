@@ -70,7 +70,7 @@ jobs:
               exit 0
             } else {
               Write-Host "❌ Crystal executable not found at expected location" -ForegroundColor Red
-              Write-Host "Contents of $extractPath:" -ForegroundColor Yellow
+              Write-Host "Contents of ${extractPath}:" -ForegroundColor Yellow
               Get-ChildItem -Path $extractPath -Recurse -Name "crystal.exe" | ForEach-Object { Write-Host "  Found: $_" }
               throw "Crystal executable not found"
             }
