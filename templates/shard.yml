@@ -7,7 +7,6 @@ authors:
 dependencies:
   takarik:
     github: takarik/takarik
-    version: "~> 0.0.1"
 
 targets:
   {{APP_NAME}}:
