@@ -319,12 +319,10 @@ module Takarik::Cli
   end
 
   private def self.create_app_structure(app_name, app_dir)
-    # Create main directories
+    # Create main directories - only create directories that aren't already defined in templates
     directories = [
-      "app",
       "spec",
       "config",
-      "models",
       "db/migrations",
       "public",
       "views/layouts",
@@ -337,7 +335,7 @@ module Takarik::Cli
       puts "📁 Created directory: #{dir}"
     end
 
-    # Create all files from templates
+    # Create all files from templates (this will create the app/ structure properly)
     create_files_from_templates(app_name, app_dir)
   end
 

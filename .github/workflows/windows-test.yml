@@ -236,9 +236,23 @@ jobs:
         Set-Location "test-app"
         if (Test-Path "shard.yml") {
           Write-Host "Testing generated project build..." -ForegroundColor Yellow
+
+          Write-Host "Installing dependencies for generated project..." -ForegroundColor Yellow
           shards install
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "❌ Failed to install dependencies for generated project" -ForegroundColor Red
+            exit 1
+          }
+
+          Write-Host "Building generated project..." -ForegroundColor Yellow
           shards build
-          Write-Host "✅ Generated project builds successfully!" -ForegroundColor Green
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "✅ Generated project builds successfully!" -ForegroundColor Green
+          } else {
+            Write-Host "❌ Generated project failed to build" -ForegroundColor Red
+            Write-Host "This indicates a template issue that needs to be fixed." -ForegroundColor Yellow
+            exit 1
+          }
         }
 
     - name: Run specs (if any)
