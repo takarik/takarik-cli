@@ -397,12 +397,3 @@ module Takarik::Cli
     end
   end
 end
-
-<<<<<<< HEAD
-# Main entry point for the CLI - only run if this file is executed directly
-if PROGRAM_NAME.ends_with?("takarik-cli.cr")
-  Takarik::Cli.run(ARGV)
-end
-=======
-# Module only - no execution here
->>>>>>> 8ab467a (Refactor CLI structure: separate entry point from module - create src/cli.cr as main entry point)
