@@ -22,34 +22,48 @@ jobs:
       run: |
         Write-Host "Installing Crystal on Windows..." -ForegroundColor Cyan
 
-        # Method 1: Try direct download from Crystal releases
-        Write-Host "Downloading Crystal Windows installer..." -ForegroundColor Yellow
+        # Use portable Crystal instead of GUI installer to avoid hanging
+        Write-Host "Downloading Crystal portable package..." -ForegroundColor Yellow
         $ProgressPreference = 'SilentlyContinue'
 
-        # Get the latest Crystal release for Windows
         try {
+          # Get the latest Crystal release for Windows
           $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/crystal-lang/crystal/releases/latest"
-          $windowsAsset = $releases.assets | Where-Object { $_.name -like "*windows*msvc*exe" } | Select-Object -First 1
+          $windowsAsset = $releases.assets | Where-Object { $_.name -like "*windows*msvc*zip" } | Select-Object -First 1
 
           if ($windowsAsset) {
-            Write-Host "Found Crystal installer: $($windowsAsset.name)" -ForegroundColor Green
-            $installerPath = "$env:TEMP\crystal-installer.exe"
-            Invoke-WebRequest -Uri $windowsAsset.browser_download_url -OutFile $installerPath
+            Write-Host "Found Crystal portable: $($windowsAsset.name)" -ForegroundColor Green
+            $zipPath = "$env:TEMP\crystal-portable.zip"
+            $extractPath = "C:\crystal"
 
-            Write-Host "Running Crystal installer..." -ForegroundColor Yellow
-            Start-Process -FilePath $installerPath -ArgumentList "/S" -Wait
+            Write-Host "Downloading portable package..." -ForegroundColor Yellow
+            Invoke-WebRequest -Uri $windowsAsset.browser_download_url -OutFile $zipPath
 
-            # Add Crystal to PATH for this session
-            $env:PATH = "$env:PATH;C:\crystal\bin"
+            Write-Host "Extracting Crystal..." -ForegroundColor Yellow
+            Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
+
+            # Find the actual crystal directory inside the extracted folder
+            $crystalDir = Get-ChildItem -Path $extractPath -Directory | Select-Object -First 1
+            if ($crystalDir) {
+              $crystalBinPath = "$($crystalDir.FullName)\bin"
+              Write-Host "Crystal extracted to: $crystalBinPath" -ForegroundColor Cyan
+            } else {
+              $crystalBinPath = "$extractPath\bin"
+            }
+
+            # Add to PATH for this session
+            $env:PATH = "$crystalBinPath;$env:PATH"
 
             Write-Host "Verifying Crystal installation..." -ForegroundColor Yellow
             crystal --version
             shards --version
+
+            Write-Host "✅ Crystal installed successfully!" -ForegroundColor Green
           } else {
-            throw "No Windows installer found in latest release"
+            throw "No Windows portable package found in latest release"
           }
         } catch {
-          Write-Host "Direct download failed: $($_.Exception.Message)" -ForegroundColor Red
+          Write-Host "Portable download failed: $($_.Exception.Message)" -ForegroundColor Red
           Write-Host "Trying Scoop installation..." -ForegroundColor Yellow
 
           # Fallback to Scoop method
@@ -172,7 +186,7 @@ jobs:
         if (Test-Path "test-app") {
           Write-Host "✅ Project directory created!" -ForegroundColor Green
           Write-Host "Project structure:" -ForegroundColor Cyan
-          Get-ChildItem "test-app" -Recurse | Select-Object Name, Mode | Format-Table
+          Get-ChildItem "test-app" -Recurse | Select-Object Name, Mode | Format-Table -AutoSize
         } else {
           Write-Host "❌ Project directory not created!" -ForegroundColor Red
           exit 1
